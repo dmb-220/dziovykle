@@ -1,6 +1,6 @@
 #define ROTARYSTEPS 1
 #define ROTARYMIN   0
-#define ROTARYMAX   100
+#define ROTARYMAX   10000
 #define MYKTUKAS    4
 
 int lastPos = -1, newPos;
