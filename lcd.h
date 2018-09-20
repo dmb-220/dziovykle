@@ -1,16 +1,14 @@
-#define LCD_PVM_PIN               5
-
-const char* meniu_list[5] = {
-  "Laikrodis","Temperatura","Ventiliatorius", "Kiti", "Atgal",
-  };
-const char* savaites_dienos[7] = {
-  "Pirmadienis", "Antradienis", "Treciadienis", "Ketvirtadienis", "Penktadienis", "Sestadienis", "Sekmadienis"
+const char* meniu_list[2][5] = {
+  {"Laikrodis","Temperatura","Ventiliatorius", "Kiti", "El. parodymai"},
+  {"Laikmatis","...","...", "...", "Atgal"},  
   };
 
-unsigned char tempa = 1;
+const char* rezo[5] = {
+  "10", "5", "1", "0.5", "0.1",
+  };
+
 int sildymas_sk = 1, sild_sk = 0;
-float sena_temp;
-  
+float sena_temp = 100.0; 
 unsigned char eile = 0, vieta = 1, pozicija;
 
 //laikrodzio kintamieji
@@ -19,6 +17,18 @@ byte set_valandos = 12, set_minutes = 30, set_sekundes = 0, set_menesis, set_die
 //nes 2018 i char netelpa
 int set_metai;
 unsigned char first_time = 0;
+
+void elektra(){
+  //skaisciuojam kiek laiko ijungtas buna sildytuvas
+  if(sildymas){el_sk++;}
+  if(el_sk>59){el_min++; el_sk = 0;}   
+  if(el_min>59){el_val++; el_min = 0;}
+  if(el_val>24){el_day++; el_val = 0;}
+  laikas = el_min / 60;
+  if(el_val){laikas = laikas + el_val;}
+  if(el_day){laikas = laikas + (el_day * 24);}
+  kwh = (TENAS_GALIA * laikas) / 1000;  
+  }
 
 void set_laikrodis(){
   set_sekundes = rtc.second();
@@ -40,10 +50,18 @@ void pradinis_langas(){
     //nuskaitomas rotary encoder
     rotary_encoder();
     
-    u8g2.setFont(u8g2_font_t0_11_mn);
+    u8g2.setFont(u8g2_font_profont12_tr);
     u8g2.drawFrame(0,0,128,14);
+     u8g2.setCursor(2, 11);
+     u8g2.print("OFF: ");
+     u8g2.print("00:00");
+     u8g2.print(" |");
+    //elektra
+     u8g2.setCursor(75, 11);
+     u8g2.print(kwh);
+     u8g2.print(" kWh"); 
     
-    if(rtc.hour() >= 10){
+    /*if(rtc.hour() >= 10){
       u8g2.setCursor(72, 11);
       u8g2.print(rtc.hour());}else{
         u8g2.setCursor(72, 11);
@@ -67,7 +85,7 @@ void pradinis_langas(){
     
     u8g2.setCursor(105, 10);
     u8g2.print(":");
-    if(rtc.second() >= 11){
+    if(rtc.second() >= 10){
       u8g2.setCursor(112, 11);
       u8g2.print(rtc.second());}else{
         u8g2.setCursor(112, 11);
@@ -75,22 +93,31 @@ void pradinis_langas(){
         
         u8g2.setCursor(118, 11);
         u8g2.print(rtc.second());
-      }
+      }*/
       
        u8g2.setFont(u8g2_font_7x13B_mf);
-       u8g2.setCursor(70, 45);
+       u8g2.drawFrame(52,28,76,36);
+       u8g2.drawFrame(54,30,72,32);
+       u8g2.setCursor(68, 42);
        u8g2.print(t);
        u8g2.print(" °C");
-       u8g2.setCursor(70, 60);
+       u8g2.setCursor(68, 57);
        u8g2.print(h);
        u8g2.print(" %");
-
-       //
+       
        u8g2.setFont(u8g2_font_profont12_tr);
-       u8g2.drawFrame(0,15,51,13);
+
+       u8g2.drawFrame(52,15,76,12);
+       u8g2.setCursor(54, 25);
+       u8g2.print("SET: ");
+       u8g2.print(temp);
+       u8g2.print(" C");
+       
+       u8g2.drawFrame(0,15,51,12);
+       u8g2.drawStr(2, 25, "PWR:");
        if(dziovykle){
-        u8g2.drawStr(2, 25, "Ijungta");}else{
-          u8g2.drawStr(2, 25, "Isjungta");}
+        u8g2.drawStr(30, 25, " ON");}else{
+          u8g2.drawStr(30, 25, "OFF");}
 
        u8g2.drawFrame(0,28,51,12);
        u8g2.drawStr(2, 38, "APS:");
@@ -132,26 +159,40 @@ void nustatymai_meniu(){
       if(vieta == i){
         u8g2.drawStr(0, (10*i)+12,"[]");
       }
-      u8g2.drawStr(15, (10*i)+12,meniu_list[i-1]);
+      u8g2.drawStr(15, (10*i)+12,meniu_list[kadras][i-1]);
       }
       
     if(button!=btn){
-      //laikrodis
-      if(btn == 1 && vieta == 1){set_laikrodis(); set_meniu=3; btn = 0;}
-      //Sildymas
-      if(btn == 1 && vieta == 2){set_meniu = 4; vieta = 1; btn = 0;}
-      //ventiliatorius
-      if(btn == 1 && vieta == 3){set_meniu = 5; vieta = 1; btn = 0;}
-      //kiti
-      if(btn == 1 && vieta == 4){set_meniu = 6; vieta = 1; btn = 0;}
-      //Atgal
-      if(btn == 1 && vieta == 5){set_meniu = 1; vieta = 1; btn = 0;}
+      if(kadras == 0){
+        //laikrodis
+        if(btn == 1 && vieta == 1){set_laikrodis(); set_meniu=3; btn = 0;}
+        //Sildymas
+        if(btn == 1 && vieta == 2){set_meniu = 4; vieta = 1; btn = 0;}
+        //ventiliatorius
+        if(btn == 1 && vieta == 3){set_meniu = 5; vieta = 1; btn = 0;}
+        //kiti
+        if(btn == 1 && vieta == 4){set_meniu = 6; vieta = 1; btn = 0;}
+        //EL. parodymai
+        if(btn == 1 && vieta == 5){set_meniu = 7; vieta = 1; btn = 0;}
+      }
+      if(kadras == 1){
+        //laikmatis
+        if(btn == 1 && vieta == 1){set_meniu = 8; btn = 0;}
+        //
+        if(btn == 1 && vieta == 2){set_meniu = 1; vieta = 1; btn = 0;}
+        //
+        if(btn == 1 && vieta == 3){set_meniu = 1; vieta = 1; btn = 0;}
+        //
+        if(btn == 1 && vieta == 4){set_meniu = 1; vieta = 1; btn = 0;}
+        //Atgal
+        if(btn == 1 && vieta == 5){set_meniu = 1; vieta = 1; btn = 0;}
+      }
       
        //if(btn == 1 && vieta == 3){set_meniu=5; vieta = 1; btn = 0;}
        //if(btn == 3){set_meniu=1; vieta = 1; btn = 0;}
        //Meniu pasirinkimas
-       if(btn == 2){if(vieta < 6){vieta++;} if(vieta == 6){vieta = 1;} btn = 0;}
-       if(btn == 3){if(vieta > 0){vieta--;} if(vieta == 0){vieta = 5;}btn = 0;}
+       if(btn == 2){if(vieta < 6){vieta++;} if(vieta == 6){vieta = 1; kadras = !kadras;} btn = 0;}
+       if(btn == 3){if(vieta > 0){vieta--;} if(vieta == 0){vieta = 5; kadras = !kadras;}btn = 0;}
        } 
        } while ( u8g2.nextPage() );
 }
@@ -239,8 +280,7 @@ void laiko_datos_nustatymai(){
         u8g2.setCursor(103, 37); u8g2.print(set_diena);
       }
       
-     u8g2.drawStr(45, 50, savaites_dienos[3]);
-     u8g2.setCursor(25, 50); u8g2.print(set_savaite);
+     u8g2.setCursor(45, 50); u8g2.print(set_savaite);
      
      u8g2.drawStr(45, 63, "ATGAL");
     
@@ -274,32 +314,34 @@ void sildymo_nustatymai(){
         u8g2.drawStr(0, (vieta*13)+11,"[>]");
       }
     }
-    u8g2.setCursor(45, 24);
+    u8g2.setCursor(40, 24);
     u8g2.print("POWER: ");
     if(sildymas_power){
       u8g2.print(" ON");}else{
-        u8g2.print("OFF");}
-    u8g2.setCursor(45, 37);
-    u8g2.print("MIN: ");
-    u8g2.print(min_temp);
+        u8g2.print("OFF");
+        }
+    u8g2.setCursor(40, 37);
+    u8g2.print("REZO: ");
+    u8g2.print(rezo[rezoliucija]);
     u8g2.print(" °C");
-    u8g2.setCursor(45, 50);
-    u8g2.print("MAX: ");
-    u8g2.print(max_temp);
+    
+    u8g2.setCursor(40, 50);
+    u8g2.print("TEMP: ");
+    u8g2.print(temp);
     u8g2.print(" °C");
 
     if(!save){
-    u8g2.drawBox(28, 54, 33,10                                                                                     );
-    u8g2.setColorIndex(0);
-    u8g2.drawStr(30, 63, "ATGAL");
-    u8g2.setColorIndex(1);
-    u8g2.drawStr(70, 63, "ISSAUGOTI");
-    }else{
-      u8g2.drawBox(68, 54, 57,10                                                                                     );
+      u8g2.drawBox(28, 54, 33,10                                                                                     );
       u8g2.setColorIndex(0);
-      u8g2.drawStr(70, 63, "ISSAUGOTI");
-      u8g2.setColorIndex(1);
       u8g2.drawStr(30, 63, "ATGAL");
+      u8g2.setColorIndex(1);
+      u8g2.drawStr(70, 63, "ISSAUGOTI");
+      }else{
+        u8g2.drawBox(68, 54, 57,10                                                                                     );
+        u8g2.setColorIndex(0);
+        u8g2.drawStr(70, 63, "ISSAUGOTI");
+        u8g2.setColorIndex(1);
+        u8g2.drawStr(30, 63, "ATGAL");
       }
     
     if(button!=btn){
@@ -311,13 +353,14 @@ void sildymo_nustatymai(){
        if(pozicija){
         if(vieta == 1){
           if(btn == 2 || btn == 3){sildymas_power = !sildymas_power; btn = 0;}}
-        if(vieta == 2){
-          if(btn == 2){min_temp++; btn = 0;}
-          if(btn == 3){min_temp--; btn = 0;}
-          }
         if(vieta == 3){
-          if(btn == 2){max_temp++; btn = 0;}
-          if(btn == 3){max_temp--; btn = 0;}
+          if(btn == 2){if(temp <= 90){temp++;} btn = 0;}
+          if(btn == 3){if(temp >= 30){temp--;} btn = 0;}
+          }
+          //jei kas dar pataisysim
+        if(vieta == 2){
+          if(btn == 2){if(rezoliucija < 4){rezoliucija++;}else{rezoliucija = 0;} btn = 0;}
+          if(btn == 3){if(rezoliucija > 0){rezoliucija--;}else{rezoliucija = 4;} btn = 0;}
           }
           if(vieta == 4){
           if(btn == 2){save = !save; btn = 0;}
@@ -436,20 +479,21 @@ void kiti_nustatymai(){
         u8g2.drawStr(0, (vieta*13)+11,"[>]");
       }
       }
-    //lcd_kontrastas = 70;
+    //on_sildymas = 20;
+    //off_sildymas = 30;
     u8g2.setCursor(45, 24);
     u8g2.print("POWER: ");
     if(dziovykle){
       u8g2.print(" ON");}else{
         u8g2.print("OFF");}
-    //u8g2.setCursor(45, 37);
-    //u8g2.print("MIN: ");
-    //u8g2.print(min_fan);
-    //u8g2.print(" %");
+    u8g2.setCursor(45, 37);
+    u8g2.print("OFF: ");
+    u8g2.print(off_sildymas);
+    u8g2.print(" s.");
     u8g2.setCursor(45, 50);
-    u8g2.print("LCD: ");
-    u8g2.print(lcd_kontrastas);
-    u8g2.print(" %");
+    u8g2.print(" ON: ");
+    u8g2.print(on_sildymas);
+    u8g2.print(" s.");
     
     if(!save){
       u8g2.drawBox(28, 54, 33,10                                                                                     );
@@ -475,13 +519,13 @@ void kiti_nustatymai(){
         if(vieta == 1){
           if(btn == 2 || btn == 3){dziovykle = !dziovykle; btn = 0;}}
           
-        /*if(vieta == 2){
-          if(btn == 2){min_fan++; btn = 0;}
-          if(btn == 3){min_fan--; btn = 0;}
-          }*/
+        if(vieta == 2){
+          if(btn == 2){off_sildymas++; btn = 0;}
+          if(btn == 3){off_sildymas--; btn = 0;}
+          }
         if(vieta == 3){
-          if(btn == 2){lcd_kontrastas++; btn = 0;}
-          if(btn == 3){lcd_kontrastas--; btn = 0;}
+          if(btn == 2){on_sildymas++; btn = 0;}
+          if(btn == 3){on_sildymas--; btn = 0;}
           }
         if(vieta == 4){
           if(btn == 2){save = !save; btn = 0;}
